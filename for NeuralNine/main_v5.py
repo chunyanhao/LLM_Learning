@@ -1,3 +1,4 @@
+from pathlib import Path
 from dotenv import load_dotenv
 # 导入读取 .env 文件的函数。
 from langchain_community.vectorstores import FAISS
@@ -7,7 +8,7 @@ from langchain_openai import OpenAIEmbeddings
 # 导入 OpenAI 文本嵌入模型。
 from langchain_core.tools import create_retriever_tool
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 加载 .env 中的 OPENAI_API_KEY。
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large",)

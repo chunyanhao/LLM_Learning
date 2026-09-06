@@ -1,3 +1,4 @@
+from pathlib import Path
 from dotenv import load_dotenv
 # 导入 load_dotenv，用来读取项目根目录中的 .env 文件。
 
@@ -6,7 +7,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 # 导入 OpenAIEmbeddings，用来把文本转换为向量。
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 在创建嵌入模型前加载 OPENAI_API_KEY。
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")

@@ -1,3 +1,4 @@
+from pathlib import Path
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
@@ -7,7 +8,7 @@ from langchain.agents.middleware import ModelRequest, ModelResponse, wrap_model_
 from langchain.messages import SystemMessage, HumanMessage, AIMessage
 
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 basic_model = init_chat_model(model='gpt-4o-mini')
 advanced_model = init_chat_model(model='gpt-4.1-mini')

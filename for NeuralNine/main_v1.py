@@ -1,4 +1,5 @@
 import requests
+from pathlib import Path
 # 导入 requests 库，用来向天气网站发送 HTTP 请求。
 from dotenv import load_dotenv
 # 导入 load_dotenv，用来读取 .env 文件中的环境变量，api_key。
@@ -22,7 +23,7 @@ def get_weather(city: str):
     # 把网站返回的 JSON 天气数据转换成 Python 对象并返回。
 
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 读取项目根目录中的 .env 文件，把里面的配置加载为环境变量。
 
 agent = create_agent(

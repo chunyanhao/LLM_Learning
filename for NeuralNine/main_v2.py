@@ -1,5 +1,6 @@
 import requests
 # 导入 requests 库，用来向天气网站发送 HTTP 请求。
+from pathlib import Path
 from dotenv import load_dotenv
 # 导入 load_dotenv，用来读取 .env 文件中的环境变量，api_key。
 
@@ -10,7 +11,7 @@ from langchain.chat_models import init_chat_model
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 # 导入系统消息、用户消息和 AI 消息类型。
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 读取 .env 中的 OPENAI_API_KEY。
 
 model = init_chat_model(

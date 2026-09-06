@@ -2,10 +2,11 @@ from dataclasses import dataclass
 
 import requests
 # 用来向天气网站发送 HTTP 请求。
+from pathlib import Path
 from dotenv import load_dotenv
 # 读取 .env 文件中的环境变量，api_key。
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 读取项目根目录中的 .env 文件，把里面的配置加载为环境变量。
 
 from langchain.agents import create_agent

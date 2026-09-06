@@ -1,3 +1,4 @@
+from pathlib import Path
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
@@ -5,7 +6,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import ModelRequest, ModelResponse, dynamic_prompt
 # 导入 Agent 中间件相关的类，用于动态提示和运行时上下文处理。
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 @dataclass
