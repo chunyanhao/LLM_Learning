@@ -6,3 +6,6 @@ python-dotenv
 langchain-google-genai
 pypdf
 pymupdf
+sentence-transformers
+faiss-cpu
+chromadb
