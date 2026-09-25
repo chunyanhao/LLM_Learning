@@ -1,4 +1,6 @@
 langchain
+langgraph
+langsmith
 langchain_community
 langchain-openai
 langchain-groq
