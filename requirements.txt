@@ -12,3 +12,4 @@ sentence-transformers
 faiss-cpu
 chromadb
 fonttools
+langchain_tavily
