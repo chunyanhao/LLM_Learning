@@ -13,3 +13,5 @@ faiss-cpu
 chromadb
 fonttools
 langchain_tavily
+langchain-mcp-adapters
+mcp
