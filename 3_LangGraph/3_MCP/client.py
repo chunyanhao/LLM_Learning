@@ -1,6 +1,7 @@
 import asyncio
-import os
-import sys
+import os # 获取环境变量
+import sys # 返回当前正在运行 client.py 的 Python interpreter 路径
+# 用和当前程序同一个 Python environment 去启动 mathserver.py
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -12,6 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 def create_mcp_client():
+    # 创建一个 MCP client，而且这个 client 可以同时连接多个 MCP servers
+    # 一个 client 可以管理多个 server connection
     return MultiServerMCPClient(
         {
             "math": {
@@ -37,7 +40,7 @@ async def main():
     model = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o"))
     agent = create_agent(
         model=model,
-        tools=tools,
+        tools=tools, # 这句是整个 MCP demo 的核心， 相当于返回tools = [add，multiply,get_weather]
         system_prompt=(
             "Use the math tools for calculations and the weather tool for weather. "
             "The weather tool returns demo data, not a live forecast; say so."
