@@ -20,11 +20,11 @@ def create_mcp_client():
             "math": {
                 "command": sys.executable,
                 "args": [str(BASE_DIR / "mathserver.py")],
-                "transport": "stdio",
+                "transport": "stdio", #定义和这个server传输的方式
             },
             "weather": {
                 "url": os.getenv("WEATHER_MCP_URL", "http://127.0.0.1:8000/mcp"),
-                "transport": "streamable_http",
+                "transport": "streamable_http",#这个server有自己独立的http
             },
         }
     )
@@ -36,7 +36,7 @@ async def main():
         raise RuntimeError("请在项目根目录的 .env 中设置 OPENAI_API_KEY。")
 
     client = create_mcp_client()
-    tools = await client.get_tools()
+    tools = await client.get_tools() # await是async 函数的调用方法，async可以解决进程并发的问题concurrency，遇到需要等待的时候让出执行权，节省时间
     model = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o"))
     agent = create_agent(
         model=model,
