@@ -1,0 +1,36 @@
+{
+  "memory_validation": {
+    "first_validation": {
+      "passed": true,
+      "issues": [],
+      "scope": "Length, practice-data label, and presence of a returned URL only; not claim verification."
+    },
+    "second_answer": "US inflation was 3.0% in 2024. This repeats the numerical result retrieved earlier in the conversation.",
+    "second_validation": {
+      "passed": true,
+      "issues": [],
+      "scope": "Length, practice-data label, and presence of a returned URL only; not claim verification."
+    },
+    "second_tool_calls_used": 0,
+    "result": "Prior-turn CSV evidence is not checked for the practice-data label on a later turn."
+  },
+  "cli_validation_failure": {
+    "answer": "Done.",
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Answer shorter than 50 characters"
+      ],
+      "scope": "Length, practice-data label, and presence of a returned URL only; not claim verification."
+    },
+    "exit_code": 0,
+    "result": "CLI exits successfully when validation fails without an exception."
+  },
+  "empty_search_message": {
+    "result": {
+      "error": "No search results found"
+    },
+    "note": "String error response becomes a structured error; this is handled."
+  },
+  "scope": "Offline probes only. ScriptedModel injects messages; no model reasoning or live failure recovery is evaluated. No API calls."
+}

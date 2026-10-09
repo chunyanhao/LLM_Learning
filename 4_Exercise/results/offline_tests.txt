@@ -1,0 +1,15 @@
+test_budget_and_new_turn_reset (__main__.ExerciseTests.test_budget_and_new_turn_reset) ... ok
+test_change_is_percentage_points (__main__.ExerciseTests.test_change_is_percentage_points) ... ok
+test_missing_search_key (__main__.ExerciseTests.test_missing_search_key) ... ok
+test_oversized_batch_never_executes (__main__.ExerciseTests.test_oversized_batch_never_executes) ... ok
+test_ranking_spread_and_no_partial_comparison (__main__.ExerciseTests.test_ranking_spread_and_no_partial_comparison) ... ok
+test_real_toolnode_loop_and_validator (__main__.ExerciseTests.test_real_toolnode_loop_and_validator) ... ok
+test_retrieval_alias_missing_year (__main__.ExerciseTests.test_retrieval_alias_missing_year) ... ok
+test_tool_error_returns_to_model (__main__.ExerciseTests.test_tool_error_returns_to_model) ... ok
+test_validator_reports_issues (__main__.ExerciseTests.test_validator_reports_issues) ... ok
+test_zero_budget_executes_no_tools (__main__.ExerciseTests.test_zero_budget_executes_no_tools) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.023s
+
+OK

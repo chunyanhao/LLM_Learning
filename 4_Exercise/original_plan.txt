@@ -1,0 +1,1063 @@
+
+之前你说第七周Agentic Workflow，我们需要安排一天实战“用 LangGraph 做一个 Research/Data Analyst Agent  ” 今天我准备做这个，现在请给我详细的指导计划
+
+
+Worked for 18s
+非常适合今天做，而且我建议把范围控制在 “一个真正像 Data Analyst 工作的 hybrid agent”，而不是堆很多花哨功能。
+
+按你现在已经学过的内容，今天这个项目的价值在于把这些零散知识真正串起来：
+
+LLM → tool selection → ToolNode → state → loop → deterministic validation → final answer
+
+这正好对应 LangGraph 官方现在强调的思路：先把 workflow 拆成离散步骤，区分 LLM step / data step / action step / human-input step，再设计 state 和 edges，而不是一上来就“让 agent 自己干所有事情”。
+
+我建议按你平时约 4 小时的学习节奏，今天完成下面这个 MVP。
+
+今天的项目：Research / Data Analyst Agent
+最终让它可以回答这种问题：
+
+Compare the economic performance of the US and Germany. Use the dataset for quantitative evidence, search the web for possible explanations, and give me a concise analyst-style conclusion.
+
+Agent 自己决定：
+
+用户问题
+   ↓
+需要 dataset 吗？
+需要 web research 吗？
+需要 calculation 吗？
+   ↓
+选择合适 tool
+   ↓
+执行 tool
+   ↓
+观察结果
+   ↓
+是否还需要更多信息？
+   ├── Yes → 再调用工具
+   └── No
+        ↓
+整理最终 analyst answer
+注意这里最重要的不是“经济数据”，而是：
+
+LLM 不知道固定执行路径，它根据 intermediate results 决定下一步。
+
+这才是真正让你练到 agentic workflow。
+
+一、今天先不要做什么
+为了保证你今天真的能做完，先明确 scope。
+
+今天 不做：
+
+Multi-agent
+Planner / Executor / Replanner
+MCP
+Deep Agents
+RAG/vector DB
+SQL Agent
+sophisticated memory
+production deployment
+frontend
+LangSmith evaluation
+autonomous code execution
+这些都会把项目搞复杂。
+
+今天就是：
+
+Single-agent + multiple tools + LangGraph loop + hybrid workflow
+
+这个难度刚刚好。
+
+二、项目整体 architecture
+我建议你画成下面这个：
+
+                   ┌───────────────────┐
+                   │    User Query     │
+                   └────────┬──────────┘
+                            ↓
+                   ┌───────────────────┐
+                   │   Analyst Agent   │
+                   │       LLM         │
+                   └────────┬──────────┘
+                            │
+               tool call?   │
+                    ┌───────┴────────┐
+                    │                │
+                   YES               NO
+                    │                │
+                    ↓                ↓
+              ┌──────────┐     ┌─────────────┐
+              │ ToolNode │     │  Validator  │
+              └────┬─────┘     └──────┬──────┘
+                   │                   │
+             ┌─────┼──────┐            ↓
+             ↓     ↓      ↓       Final Answer
+          Data    Calc    Web
+          Tool    Tool   Search
+             │     │      │
+             └─────┴──────┘
+                   ↓
+             Analyst Agent
+                   │
+               iterate...
+你今天要真正理解：
+
+Agent node
+     ↓
+tools_condition
+     ↓
+ToolNode
+     ↓
+Agent node
+就是一个最基本的 agent loop。
+
+三、准备一个简单 dataset
+不要浪费时间找复杂数据。
+
+自己做一个：
+
+macro_data.csv
+例如：
+
+country	year	gdp_growth	inflation	unemployment	debt_gdp
+United States	2023	2.9	4.1	3.6	118
+United States	2024	2.8	3.0	4.0	121
+Germany	2023	-0.3	5.9	3.1	63
+Germany	2024	-0.2	2.5	3.4	63
+Japan	2023	1.5	3.3	2.6	249
+Japan	2024	0.1	2.7	2.5	251
+今天数据真实性不是重点。
+
+甚至可以再多放 10–20 行。
+
+四、先设计 Tools，不要先写 Graph
+这是今天第一个非常重要的训练。
+
+问自己：
+
+Agent 为了完成 analyst task，需要哪些能力？
+
+我建议只给 4 个 tools。
+
+Tool 1 — get_country_data
+输入：
+
+country: str
+year: int
+输出：
+
+{
+    "country": "Germany",
+    "year": 2024,
+    "gdp_growth": -0.2,
+    "inflation": 2.5,
+    ...
+}
+这里是：
+
+deterministic data retrieval
+
+LLM 不应该自己猜数字。
+
+Tool 2 — compare_metric
+输入：
+
+countries: list[str]
+metric: str
+year: int
+例如：
+
+compare_metric(
+    ["United States", "Germany"],
+    "gdp_growth",
+    2024
+)
+返回：
+
+{
+    "United States": 2.8,
+    "Germany": -0.2
+}
+也是 deterministic。
+
+Tool 3 — calculate_change
+例如：
+
+calculate_change(
+    country="United States",
+    metric="inflation",
+    start_year=2023,
+    end_year=2024
+)
+返回：
+
+{
+    "start": 4.1,
+    "end": 3.0,
+    "change": -1.1
+}
+这里尤其重要：
+
+不要让 LLM 做 arithmetic。
+
+让 code 做 calculation。
+
+这就是你这两天一直在学的：
+
+LLM reasoning vs deterministic execution boundary。
+
+Tool 4 — web_search
+用你之前已经学过的 Tavily 就行：
+
+@tool
+def web_search(query: str):
+    ...
+它负责解释：
+
+为什么德国经济弱？
+
+dataset 提供：
+
+what happened
+
+web search 提供：
+
+why it might have happened
+
+这一下整个项目就非常像 analyst workflow 了。
+
+五、先自己回答一个重要问题
+写代码之前，在 notebook 里写一段 Markdown：
+
+## Agent vs deterministic responsibilities
+
+### LLM
+- Understand the user's question
+- Decide which tool to call
+- Decide tool arguments
+- Decide whether more research is needed
+- Synthesize evidence
+- Produce final analyst conclusion
+
+### Code
+- Retrieve numerical data
+- Perform calculations
+- Validate inputs
+- Execute tools
+- Enforce tool-call limits
+这一段 非常重要。
+
+因为如果以后面试官问：
+
+Why did you build this as an agent?
+
+你就不会只说：
+
+Because I used LangGraph.
+
+而会说：
+
+I used deterministic code for numerical retrieval and calculations, while the LLM handled ambiguous decisions such as selecting tools, determining whether additional research was needed, and synthesizing evidence.
+
+这才是 AI Engineer 的回答。
+
+六、设计 State
+今天不要搞复杂 State。
+
+直接：
+
+from typing import Annotated
+from typing_extensions import TypedDict
+
+from langgraph.graph.message import add_messages
+
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
+先只用：
+
+messages
+就够了。
+
+为什么？
+
+因为整个 ReAct-style loop 需要保留：
+
+HumanMessage
+AIMessage
+ToolMessage
+AIMessage
+ToolMessage
+...
+例如：
+
+Human:
+Compare Germany and US growth.
+
+AI:
+tool_call → compare_metric
+
+Tool:
+{"US": 2.8, "Germany": -0.2}
+
+AI:
+I should research why Germany is weaker.
+
+AI:
+tool_call → web_search
+
+Tool:
+...
+
+AI:
+final answer
+这整个 sequence 就存在：
+
+state["messages"]
+七、创建 tools
+这里开始真正 coding。
+
+结构建议：
+
+import pandas as pd
+
+df = pd.read_csv("macro_data.csv")
+然后：
+
+from langchain_core.tools import tool
+例如：
+
+@tool
+def get_country_data(country: str, year: int) -> dict:
+    """Get macroeconomic indicators for a country and year."""
+
+    result = df[
+        (df["country"] == country)
+        & (df["year"] == year)
+    ]
+
+    if result.empty:
+        return {
+            "error": f"No data found for {country} in {year}"
+        }
+
+    return result.iloc[0].to_dict()
+注意 docstring。
+
+你已经学过：
+
+Tool schema 是给 LLM 看 tool capability 的重要信息。
+
+所以不要：
+
+"""get data"""
+而应该明确：
+
+"""Retrieve macroeconomic indicators including GDP growth,
+inflation, unemployment, and debt-to-GDP for a specific
+country and year.
+"""
+八、Bind tools
+然后你终于把 Week 5 的知识真正用起来：
+
+tools = [
+    get_country_data,
+    compare_metric,
+    calculate_change,
+    web_search
+]
+
+llm_with_tools = llm.bind_tools(tools)
+现在问自己：
+
+bind_tools 做了什么？
+不是执行工具。
+
+而是：
+
+tool schema
+      ↓
+provided to LLM
+      ↓
+LLM knows what actions are available
+LLM 之后可能返回：
+
+AIMessage(
+    tool_calls=[
+        {
+            "name": "compare_metric",
+            "args": {
+                "countries": [
+                    "United States",
+                    "Germany"
+                ],
+                "metric": "gdp_growth",
+                "year": 2024
+            }
+        }
+    ]
+)
+到这里：
+
+tool 还没有执行。
+
+这个概念你今天一定要观察出来。
+
+九、创建 Agent Node
+Agent node 非常简单：
+
+def analyst_agent(state: State):
+
+    response = llm_with_tools.invoke(
+        state["messages"]
+    )
+
+    return {
+        "messages": [response]
+    }
+这里千万不要觉得：
+
+就这么点？
+
+对。
+
+真正的 orchestration 在 graph。
+
+Agent node 只负责：
+
+State
+ ↓
+LLM
+ ↓
+AIMessage
+ ↓
+State update
+十、创建 ToolNode
+from langgraph.prebuilt import ToolNode
+
+tool_node = ToolNode(tools)
+这个 node 会：
+
+read AIMessage.tool_calls
+        ↓
+identify tool
+        ↓
+extract arguments
+        ↓
+execute Python function
+        ↓
+create ToolMessage
+        ↓
+put result back into state
+这就是之前面试题：
+
+ToolNode 抽象了什么？
+
+今天你应该真正看到答案。
+
+十一、创建最核心的 Graph
+from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import tools_condition
+然后：
+
+builder = StateGraph(State)
+
+builder.add_node(
+    "analyst",
+    analyst_agent
+)
+
+builder.add_node(
+    "tools",
+    tool_node
+)
+edges：
+
+builder.add_edge(
+    START,
+    "analyst"
+)
+最关键：
+
+builder.add_conditional_edges(
+    "analyst",
+    tools_condition
+)
+然后：
+
+builder.add_edge(
+    "tools",
+    "analyst"
+)
+最后：
+
+graph = builder.compile()
+你现在得到了：
+
+START
+  ↓
+analyst
+  ↓
+Does AIMessage contain tool_calls?
+  │
+  ├── yes → tools
+  │            ↓
+  │        analyst
+  │            ↓
+  │          ...
+  │
+  └── no → END
+这就是今天项目最重要的一张图。
+
+十二、这里停 10 分钟，真正理解 Agent Loop
+不要立刻往后写。
+
+假设用户问：
+
+Compare US and Germany growth in 2024 and explain why Germany performed worse.
+
+你先不用运行代码，自己预测：
+
+Round 1
+LLM:
+I need quantitative data.
+
+tool_call:
+compare_metric(...)
+↓
+
+Round 2
+Tool 返回：
+
+US: 2.8
+Germany: -0.2
+回到：
+
+analyst
+LLM 看见 tool result：
+
+我已经知道 what happened，但还不知道 why。
+
+所以：
+
+tool_call:
+web_search(...)
+↓
+
+Round 3
+web search 返回资料。
+
+再回：
+
+analyst
+LLM 判断：
+
+enough evidence
+
+所以不产生：
+
+tool_calls
+而产生正常回答。
+
+于是：
+
+tools_condition
+发现没有 tool call：
+
+END
+这就是：
+
+ReAct / agent loop
+不是：
+
+Reason
+Act
+Reason
+Act
+这几个字而已。
+
+而是真正体现在：
+
+LLM
+ ↓
+Tool
+ ↓
+LLM
+ ↓
+Tool
+ ↓
+LLM
+十三、运行时一定用 .stream()
+不要只：
+
+graph.invoke()
+今天特别建议：
+
+for event in graph.stream(
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": query
+            }
+        ]
+    },
+    stream_mode="updates"
+):
+    print(event)
+因为你最近刚学：
+
+values
+vs
+updates
+今天正好实际看一次。
+
+你会看到大概：
+
+analyst:
+   AIMessage(tool_call...)
+
+tools:
+   ToolMessage(...)
+
+analyst:
+   AIMessage(tool_call...)
+
+tools:
+   ToolMessage(...)
+
+analyst:
+   AIMessage(final answer)
+你会第一次很直观地看到：
+
+agent 其实就是 state 在 graph 中不断被更新。
+
+十四、加入 System Prompt
+然后提高 analyst quality：
+
+SYSTEM_PROMPT = """
+You are a research and data analyst.
+
+Your job is to answer analytical questions using available tools.
+
+Rules:
+
+1. Use data tools for quantitative claims.
+2. Never invent numerical values.
+3. Use calculation tools instead of doing arithmetic mentally.
+4. Use web search when external explanations or recent context are required.
+5. Distinguish facts from interpretation.
+6. Do not repeatedly call tools if sufficient evidence already exists.
+7. Provide a concise analyst-style final answer.
+"""
+这里同时复习：
+
+prompt 是 agent architecture 的一部分。
+
+最近 LangGraph 官方也强调：LLM node 应该拿到完成决策所需的 static context 和 dynamic state；state 本身则最好保存 raw data，而不是把一堆格式化 prompt 塞进去。
+
+十五、然后做 5 个测试
+不要只跑一个 query。
+
+Test 1：纯数据 retrieval
+What was US inflation in 2024?
+理想路径：
+
+LLM
+ ↓
+get_country_data
+ ↓
+LLM
+ ↓
+END
+Test 2：comparison
+Compare GDP growth in the US, Germany and Japan in 2024.
+理想：
+
+compare_metric
+而不是三次：
+
+get_country_data()
+这里开始观察：
+
+agent tool selection 是否合理？
+
+Test 3：calculation
+How much did US inflation change between 2023 and 2024?
+希望：
+
+calculate_change
+而不是 LLM 自己：
+
+3.0 - 4.1
+Test 4：research
+Why was Germany's growth weaker than the US in 2024?
+理想可能是：
+
+dataset
+ ↓
+web search
+ ↓
+answer
+Test 5：真正 agentic
+Identify which of the US, Germany and Japan performed
+worst in 2024, then research possible reasons and provide
+an analyst-style conclusion.
+这个最好。
+
+因为模型必须：
+
+① figure out metric
+② retrieve/compare data
+③ identify worst performer
+④ formulate new search
+⑤ web search
+⑥ synthesize
+这里没有固定：
+
+A → B → C
+所以它真的需要 reasoning / tool selection。
+
+十六、今天一定要加入一个 deterministic guardrail
+这是这周 Agentic Workflow 最重要的思想之一。
+
+不要：
+
+Everything agentic.
+
+例如 metric allowlist：
+
+ALLOWED_METRICS = {
+    "gdp_growth",
+    "inflation",
+    "unemployment",
+    "debt_gdp"
+}
+tool 中：
+
+if metric not in ALLOWED_METRICS:
+    return {
+        "error": f"Unsupported metric: {metric}",
+        "allowed_metrics": list(ALLOWED_METRICS)
+    }
+这里不要让 LLM 决定：
+
+这个 column 合不合法？
+
+这是：
+
+deterministic validation
+
+因此你的 architecture 就已经变成：
+
+Hybrid agent architecture
+LLM:
+reasoning
+routing
+tool choice
+research decisions
+synthesis
+
+        +
+
+Python:
+calculation
+validation
+data access
+execution
+constraints
+这正是你昨天学的 hybrid architecture，现在用代码落地。
+
+十七、Tool failure 也故意测试一次
+例如：
+
+Compare China's productivity growth in 2024.
+但是你的 dataset 没有：
+
+China
+productivity_growth
+你的 tool 不要 crash。
+
+返回：
+
+{
+    "error": "No data available...",
+    "available_metrics": [...]
+}
+然后看看 LLM 怎么处理。
+
+这就是：
+
+Tool error
+    ↓
+ToolMessage
+    ↓
+LLM sees failure
+    ↓
+reasons about alternative
+官方当前 LangGraph 的指导也是把错误分类型处理：transient failures 可以 retry；LLM 可恢复的错误可以作为 state/tool result 回给模型重新决策；真正 unexpected error 则不应该全部吞掉。
+
+十八、今天 HITL 不需要硬塞进去
+这一点我反而希望你学会。
+
+你的 agent：
+
+read dataset
+search web
+calculate
+generate report
+全部是：
+
+read-only
+
+没有：
+
+send email
+update DB
+execute payment
+delete file
+所以没必要为了展示技术强行：
+
+interrupt()
+这是一个很好的面试点：
+
+I did not add human approval to every tool call because the tools were read-only. HITL is more valuable around high-impact or side-effectful actions.
+
+如果你特别想复习 interrupt()，可以做一个 optional extension：
+
+如果问题缺少关键范围：
+"What country should I analyze?"
+
+↓ interrupt
+
+human provides country
+
+↓ resume
+LangGraph 当前的 interrupt() 设计确实是通过 checkpoint 保存 workflow state，再恢复同一个执行流程。
+
+但今天它是：
+
+bonus，不是 MVP。
+
+十九、Memory 也只做最轻版本
+如果今天时间够：
+
+from langgraph.checkpoint.memory import InMemorySaver
+
+checkpointer = InMemorySaver()
+
+graph = builder.compile(
+    checkpointer=checkpointer
+)
+然后：
+
+config = {
+    "configurable": {
+        "thread_id": "analyst-session-1"
+    }
+}
+先问：
+
+Compare Germany and the US in 2024.
+然后：
+
+Which one had higher inflation?
+看看第二问能不能理解：
+
+which one
+这样你就把：
+
+thread_id
++
+checkpoint memory
+也复习掉了。
+
+但不要今天加：
+
+long-term memory/store
+没必要。
+
+二十、最后加一个 deterministic validator
+这是今天我特别希望你做的。
+
+Agent final answer 出来以后，加一个 node：
+
+validate_answer
+检查：
+
+def validate_answer(state):
+    answer = state["messages"][-1].content
+
+    issues = []
+
+    if len(answer.strip()) < 50:
+        issues.append("Answer too short")
+
+    return {
+        ...
+    }
+以后可以升级成：
+
+citation present?
+numeric claims supported?
+required sections present?
+今天只简单做。
+
+Architecture 就变成：
+
+START
+  ↓
+Agent
+  ↓
+Tool?
+ ↙   ↘
+yes   no
+ ↓     ↓
+Tools Validator
+ ↓
+Agent
+这就把最近你学的：
+
+agentic reasoning 和 deterministic workflow 不应该二选一
+
+彻底落地。
+
+二十一、今天时间安排
+我建议今天严格按照这个顺序。
+
+时间	做什么	你真正练的知识
+0:00–0:20	写 dataset + 定义问题	workflow design
+0:20–0:55	写 4 个 tools	tool schema / deterministic logic
+0:55–1:15	单独测试 tools	tool execution
+1:15–1:40	State + LLM + bind_tools	state / tool binding
+1:40–2:05	ToolNode + tools_condition + graph	LangGraph
+2:05–2:30	.stream() 跑 basic tests	agent loop
+2:30–3:00	加 system prompt	agent behavior
+3:00–3:25	加 validation / errors	hybrid architecture
+3:25–3:45	checkpoint memory	state persistence
+3:45–4:00	README + architecture diagram	面试表达
+二十二、你的 notebook 最终最好长这样
+01. Project Goal
+
+02. Architecture
+
+03. Dataset
+
+04. Tools
+    - get_country_data
+    - compare_metric
+    - calculate_change
+    - web_search
+
+05. Tool Testing
+
+06. State Definition
+
+07. LLM + Tool Binding
+
+08. Analyst Node
+
+09. ToolNode
+
+10. Graph Construction
+
+11. Agent Streaming
+
+12. Test Cases
+
+13. Guardrails
+
+14. Checkpoint Memory
+
+15. Failure Cases
+
+16. Lessons Learned
+这个结构甚至以后直接可以放 GitHub。
+
+二十三、最终 README 里一定画这一张图
+                       ┌──────────────┐
+                       │  User Query  │
+                       └──────┬───────┘
+                              ↓
+                    ┌─────────────────┐
+                    │  Analyst Agent  │
+                    │      LLM        │
+                    └────────┬────────┘
+                             │
+                    tools_condition
+                      /            \
+                 tool call       no tool
+                    ↓                ↓
+             ┌────────────┐     Validator
+             │  ToolNode  │          ↓
+             └─────┬──────┘         END
+                   │
+        ┌──────────┼──────────┐
+        ↓          ↓          ↓
+      Data      Calculator    Web
+      Tools        Tool      Search
+        └──────────┼──────────┘
+                   ↓
+              Analyst Agent
+这张图实际上就能回答：
+
+What makes this workflow agentic?
+
+因为：
+
+The execution path is not fully predetermined. The LLM dynamically decides which tools to use, in what order, and whether additional research is required based on intermediate results.
+
+二十四、今天做完后你应该能回答的 10 个问题
+这比“代码成功运行”更重要。
+
+你结束时应该不用背稿就能解释：
+
+Why is this an agent rather than a simple LLM application?
+What makes the workflow agentic?
+What does bind_tools() actually do?
+Who generates tool arguments?
+Who actually executes the Python function?
+What does ToolNode abstract away?
+Why does the tool result need to go back to the LLM?
+What role does tools_condition play?
+Which parts should remain deterministic?
+Why shouldn't the entire workflow be agentic?
+如果你能结合今天的代码回答这十个问题，你的 Week 5–7 知识就开始真正连成体系了。
+
+我对今天 MVP 的最终要求
+别以：
+
+“我用了 LangGraph”
+
+作为成功标准。
+
+成功标准是你亲眼看到：
+
+User Query
+     ↓
+LLM decides
+     ↓
+Tool Call
+     ↓
+Python executes
+     ↓
+ToolMessage
+     ↓
+LLM observes
+     ↓
+LLM decides again
+     ↓
+possibly another tool
+     ↓
+Final answer
+并且你能指出：
+
+哪里是 agentic
+哪里是 deterministic
+为什么这样划分
+LangChain 当前官方文档也把 LangChain agents 定位为更方便的高层实现，而当你需要更细粒度的执行流、state 和 routing 控制时，可以直接使用 LangGraph primitives。所以今天坚持自己用 StateGraph + ToolNode + conditional edges 搭，而不是直接调用一个现成 agent abstraction，是非常适合你当前学习阶段的。
+
+你现在第一步就做 macro_data.csv + 4 个 tools。先不要碰 LangGraph。 等四个 tools 都能独立运行，再把它们接入 graph；这样你会清楚地区分 Tool → Tool Calling → Agent Loop → LangGraph orchestration，而不会把所有概念混在一起。
+
+
+
+
